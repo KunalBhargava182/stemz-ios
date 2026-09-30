@@ -1,0 +1,34 @@
+name: iosApp
+options:
+  bundleIdPrefix: com.musediagnostics
+  deploymentTarget:
+    iOS: "15.0"
+targets:
+  iosApp:
+    type: application
+    platform: iOS
+    sources:
+      - iosApp
+    scheme: {}
+    info:
+      path: iosApp/Info.plist
+      properties:
+        CFBundleDisplayName: Stemz
+        CFBundleShortVersionString: $(MARKETING_VERSION)
+        CFBundleVersion: $(CURRENT_PROJECT_VERSION)
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        CADisableMinimumFrameDurationOnPhone: true
+        NSMicrophoneUsageDescription: Stemz records heart sounds from the TAAL stethoscope.
+    settings:
+      base:
+        PRODUCT_NAME: StemzApp
+        PRODUCT_BUNDLE_IDENTIFIER: com.musediagnostics.stemz.ios
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        TARGETED_DEVICE_FAMILY: "1"
+        FRAMEWORK_SEARCH_PATHS: $(SRCROOT)/../shared/build/bin/iosArm64/releaseFramework
+        OTHER_LDFLAGS: ["-framework", "Shared"]
+        CODE_SIGNING_ALLOWED: "NO"
+        CODE_SIGNING_REQUIRED: "NO"
+        CODE_SIGN_IDENTITY: ""
