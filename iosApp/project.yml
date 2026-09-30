@@ -24,8 +24,8 @@ targets:
       base:
         PRODUCT_NAME: StemzApp
         PRODUCT_BUNDLE_IDENTIFIER: com.musediagnostics.stemz.ios
-        MARKETING_VERSION: "0.2.0"
-        CURRENT_PROJECT_VERSION: "2"
+        MARKETING_VERSION: "0.3.0"
+        CURRENT_PROJECT_VERSION: "3"
         TARGETED_DEVICE_FAMILY: "1"
         FRAMEWORK_SEARCH_PATHS: $(SRCROOT)/../shared/build/bin/iosArm64/releaseFramework
         OTHER_LDFLAGS: ["-framework", "Shared"]
