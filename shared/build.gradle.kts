@@ -1,3 +1,5 @@
+import org.jetbrains.kotlin.gradle.ExperimentalWasmDsl
+
 plugins {
     kotlin("multiplatform")
     kotlin("plugin.compose")
@@ -11,6 +13,17 @@ kotlin {
             baseName = "Shared"
             isStatic = true
         }
+    }
+
+    // Web (PWA) target: same commonMain code, runs in iPhone Safari. Added in step W1.
+    @OptIn(ExperimentalWasmDsl::class)
+    wasmJs {
+        browser {
+            commonWebpackConfig {
+                outputFileName = "stemz.js"
+            }
+        }
+        binaries.executable()
     }
 
     sourceSets {

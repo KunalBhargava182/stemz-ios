@@ -10,3 +10,4 @@ iosApp/iosApp.xcodeproj/
 iosApp/iosApp/Info.plist
 xcuserdata/
 *.ipa
+kotlin-js-store/

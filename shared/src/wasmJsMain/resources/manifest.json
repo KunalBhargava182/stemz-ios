@@ -1,0 +1,9 @@
+{
+  "name": "Stemz",
+  "short_name": "Stemz",
+  "start_url": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#2ABFBF"
+}
