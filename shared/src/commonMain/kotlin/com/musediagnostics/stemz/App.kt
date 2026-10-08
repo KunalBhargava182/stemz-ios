@@ -167,8 +167,14 @@ private fun AudioDiagnosticsScreen(probe: AudioProbe) {
             Row2("Input RMS", if (running) "${rms.format1()} dBFS" else "-")
             Row2("Input peak", if (running) "${(level?.peakDbfs ?: -90f).format1()} dBFS" else "-")
             Spacer(Modifier.height(8.dp))
-            Envelope(if (running) level?.envelope else null)
-            Text("Last ~3 s of the filtered signal, auto-scaled.", fontSize = 11.sp, color = Color(0xFF999999))
+            val lv = if (running) level else null
+            if (lv != null && lv.traceMax.isNotEmpty()) {
+                PcgPaperTrace(lv.traceMin, lv.traceMax)
+                Text("Last 4 s, filtered. 1 large box = 1 s · 1 small box = 0.2 s. Auto-scaled.", fontSize = 11.sp, color = Color(0xFF999999))
+            } else {
+                Envelope(lv?.envelope)
+                Text("Last ~3 s of the filtered signal, auto-scaled.", fontSize = 11.sp, color = Color(0xFF999999))
+            }
         }
 
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp), modifier = Modifier.fillMaxWidth()) {
@@ -270,6 +276,47 @@ private fun Envelope(env: FloatArray?) {
             val h = (env[i].coerceIn(0f, 1f)) * mid * 0.95f
             val x = i * step
             drawLine(WaveBlue, Offset(x, mid - h), Offset(x, mid + h), strokeWidth = step.coerceAtLeast(1f))
+        }
+    }
+}
+
+/** ECG-paper style live trace (colors from Android PcgScaleEcgPaperView / waveform_blue). */
+@Composable
+private fun PcgPaperTrace(mins: FloatArray, maxs: FloatArray) {
+    val minor = Color(0xFFF2B8B5).copy(alpha = 0.35f)
+    val major = Color(0xFFE0837F).copy(alpha = 0.6f)
+    Canvas(Modifier.fillMaxWidth().height(220.dp).background(Color.White)) {
+        val w = size.width
+        val h = size.height
+        val small = w / 20f                       // 4 s window, 0.2 s per small box
+        var i = 0
+        var x = 0f
+        while (x <= w + 0.5f) {
+            drawLine(if (i % 5 == 0) major else minor, Offset(x, 0f), Offset(x, h), strokeWidth = if (i % 5 == 0) 1.5f else 1f)
+            x += small; i++
+        }
+        val mid = h / 2f
+        var j = 0
+        var y = 0f
+        while (mid + y <= h + 0.5f) {
+            val c = if (j % 5 == 0) major else minor
+            val sw = if (j % 5 == 0) 1.5f else 1f
+            drawLine(c, Offset(0f, mid + y), Offset(w, mid + y), strokeWidth = sw)
+            if (j > 0) drawLine(c, Offset(0f, mid - y), Offset(w, mid - y), strokeWidth = sw)
+            y += small; j++
+        }
+        val n = maxs.size
+        if (n == 0) return@Canvas
+        val step = w / n
+        val amp = mid * 0.95f
+        var prevY = mid
+        for (k in 0 until n) {
+            val px = k * step
+            val yMax = mid - maxs[k].coerceIn(-1f, 1f) * amp
+            val yMin = mid - mins[k].coerceIn(-1f, 1f) * amp
+            drawLine(WaveBlue, Offset(px, prevY), Offset(px, yMax), strokeWidth = 2f)
+            drawLine(WaveBlue, Offset(px, yMax), Offset(px, yMin), strokeWidth = 2f)
+            prevY = yMin
         }
     }
 }

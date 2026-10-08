@@ -5,6 +5,7 @@ import com.musediagnostics.stemz.audio.AudioProbe
 import com.musediagnostics.stemz.audio.CaptureSettings
 import com.musediagnostics.stemz.audio.HeartFilter
 import com.musediagnostics.stemz.audio.LevelUpdate
+import com.musediagnostics.stemz.audio.LiveTraceBuffer
 import com.musediagnostics.taal.dsp.AudioFilterEngine
 import kotlin.math.abs
 import kotlin.math.log10
@@ -17,13 +18,15 @@ external object TaalAudio {
     fun requestPermission(cb: (Boolean) -> Unit)
     fun listInputs(cb: (String) -> Unit)
     fun onDeviceChange(cb: () -> Unit)
-    fun start(deviceId: String, onData: (JsAny, Double) -> Unit, onError: (String) -> Unit, onEnded: () -> Unit)
+    fun start(deviceId: String, onData: (JsAny, Double) -> JsAny?, onError: (String) -> Unit, onEnded: () -> Unit)
     fun trackInfo(): String
     fun stop()
 }
 
 private fun f32Length(a: JsAny): Int = js("a.length")
 private fun f32Get(a: JsAny, i: Int): Double = js("a[i]")
+private fun f32New(n: Int): JsAny = js("new Float32Array(n)")
+private fun f32Set(a: JsAny, i: Int, v: Double): Unit = js("a[i] = v")
 
 private data class WebInput(val label: String, val id: String)
 
@@ -33,7 +36,7 @@ private data class WebInput(val label: String, val id: String)
  */
 class WebAudioProbe : AudioProbe {
     override val platformLabel: String = "Web"
-    override val supportsMonitor: Boolean = false   // W3
+    override val supportsMonitor: Boolean = true
 
     private var inputs: List<WebInput> = emptyList()
     private var lastRate = 0.0
@@ -61,8 +64,12 @@ class WebAudioProbe : AudioProbe {
         return null
     }
 
+    private var lastListText: String? = null
+
     private fun refreshInputs() {
         TaalAudio.listInputs { text ->
+            if (text == lastListText) return@listInputs   // polled every 1.5 s: only react to real changes
+            lastListText = text
             inputs = text.split('\n').filter { it.isNotBlank() }.map {
                 val parts = it.split('\t')
                 WebInput(parts[0], parts.getOrElse(1) { "" })
@@ -83,6 +90,7 @@ class WebAudioProbe : AudioProbe {
     }
 
     override fun prepareSession(): String? {
+        lastListText = null
         refreshInputs()   // async; result arrives through the route listener
         return null
     }
@@ -141,12 +149,13 @@ class WebAudioProbe : AudioProbe {
         var bucketMax = 0f
         var bucketCount = 0
         var reportedInfo = false
+        val trace = LiveTraceBuffer()
 
         running = true
         TaalAudio.start(
             taal.id,
             onData = onData@{ arr, rate ->
-                if (!running) return@onData
+                if (!running) return@onData null
                 lastRate = rate
                 val fe = filterEngine ?: AudioFilterEngine(rate.toInt()).also { filterEngine = it; appliedFilter = null }
                 val s = this.settings
@@ -178,6 +187,9 @@ class WebAudioProbe : AudioProbe {
                         bucketCount = 0
                     }
                 }
+                trace.push(filtered, rate, undo)
+                val (tMin, tMax) = trace.snapshot()
+
                 var envMax = 0.01f
                 for (v in env) if (v > envMax) envMax = v
                 val rms = if (n > 0) sqrt(sumSq / n) else 0.0
@@ -188,11 +200,22 @@ class WebAudioProbe : AudioProbe {
                         captureSampleRate = rate,
                         framesPerBuffer = n,
                         envelope = FloatArray(envLen) { env[(envPos + it) % envLen] / envMax },
+                        traceMin = tMin,
+                        traceMax = tMax,
                     )
                 )
                 if (!reportedInfo) {
                     reportedInfo = true
                     routeListener?.invoke(inputInfo())
+                }
+
+                // Live monitor: hand the filtered block back to JS for playback (Android AudioTrack monitor).
+                if (s.monitor) {
+                    val out = f32New(n)
+                    for (i in 0 until n) f32Set(out, i, filtered[i].toDouble())
+                    out
+                } else {
+                    null
                 }
             },
             onError = { msg -> running = false; onError("Microphone: $msg") },
