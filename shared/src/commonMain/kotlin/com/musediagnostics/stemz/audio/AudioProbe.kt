@@ -35,6 +35,11 @@ data class CaptureSettings(
 )
 
 interface AudioProbe {
+    /** Shown in the title, e.g. "iOS" or "Web". */
+    val platformLabel: String get() = "iOS"
+    /** False hides the Listen switch (web monitor arrives in W3). */
+    val supportsMonitor: Boolean get() = true
+
     fun requestPermission(onResult: (Boolean) -> Unit)
     fun prepareSession(): String?          // returns error message or null
     fun inputInfo(): AudioInputInfo

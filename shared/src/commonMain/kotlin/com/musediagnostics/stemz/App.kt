@@ -101,7 +101,7 @@ private fun AudioDiagnosticsScreen(probe: AudioProbe) {
             .verticalScroll(rememberScrollState()).padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Text("Stemz iOS", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
+        Text("Stemz ${probe.platformLabel}", style = MaterialTheme.typography.headlineMedium, fontWeight = FontWeight.SemiBold)
         Text("Step 4: live filter + monitor", color = Color(0xFF666666))
 
         val usb = info?.usbConnected == true
@@ -146,11 +146,13 @@ private fun AudioDiagnosticsScreen(probe: AudioProbe) {
                 steps = 29,
             )
             SwitchRow("Hum filter (50/100/150 Hz)", settings.humFilter) { apply(settings.copy(humFilter = it)) }
-            SwitchRow("Listen (live monitor)", settings.monitor) { apply(settings.copy(monitor = it)) }
-            Text(
-                "Tip: use Bluetooth earbuds. The phone speaker barely plays 20–250 Hz and can feed back into the stethoscope.",
-                fontSize = 11.sp, color = Color(0xFF999999),
-            )
+            if (probe.supportsMonitor) {
+                SwitchRow("Listen (live monitor)", settings.monitor) { apply(settings.copy(monitor = it)) }
+                Text(
+                    "Tip: use Bluetooth earbuds. The phone speaker barely plays 20–250 Hz and can feed back into the stethoscope.",
+                    fontSize = 11.sp, color = Color(0xFF999999),
+                )
+            }
         }
 
         InfoCard("Live signal (filtered)") {
