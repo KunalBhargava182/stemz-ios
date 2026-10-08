@@ -50,6 +50,8 @@ import com.musediagnostics.stemz.audio.AudioProbe
 import com.musediagnostics.stemz.audio.CaptureSettings
 import com.musediagnostics.stemz.audio.HeartFilter
 import com.musediagnostics.stemz.audio.LevelUpdate
+import com.musediagnostics.stemz.audio.FilterPoint
+import com.musediagnostics.stemz.audio.measureFilterResponse
 import kotlin.math.roundToInt
 
 private val TealPrimary = Color(0xFF2ABFBF)
@@ -148,6 +150,19 @@ private fun AudioDiagnosticsScreen(probe: AudioProbe) {
             SwitchRow("Hum filter (50/100/150 Hz)", settings.humFilter) { apply(settings.copy(humFilter = it)) }
             if (probe.supportsMonitor) {
                 SwitchRow("Listen (live monitor)", settings.monitor) { apply(settings.copy(monitor = it)) }
+                if (probe.supportsMonitorGain) {
+                    Row2("Listen volume", "+${settings.monitorGainDb.roundToInt()} dB")
+                    Slider(
+                        value = settings.monitorGainDb,
+                        onValueChange = { apply(settings.copy(monitorGainDb = it.roundToInt().toFloat())) },
+                        valueRange = 0f..40f,
+                        steps = 39,
+                    )
+                    Text(
+                        "Only changes what you hear. Graph and recordings keep the pre-amp level, like Android.",
+                        fontSize = 11.sp, color = Color(0xFF999999),
+                    )
+                }
                 Text(
                     "Tip: use Bluetooth earbuds. The phone speaker barely plays 20–250 Hz and can feed back into the stethoscope.",
                     fontSize = 11.sp, color = Color(0xFF999999),
@@ -166,6 +181,9 @@ private fun AudioDiagnosticsScreen(probe: AudioProbe) {
             Spacer(Modifier.height(6.dp))
             Row2("Input RMS", if (running) "${rms.format1()} dBFS" else "-")
             Row2("Input peak", if (running) "${(level?.peakDbfs ?: -90f).format1()} dBFS" else "-")
+            if (probe.supportsMonitorGain) {
+                Row2("Listen peak", if (running) "${(level?.outputPeakDbfs ?: -90f).format1()} dBFS" else "-")
+            }
             Spacer(Modifier.height(8.dp))
             val lv = if (running) level else null
             if (lv != null && lv.traceMax.isNotEmpty()) {
@@ -203,6 +221,11 @@ private fun AudioDiagnosticsScreen(probe: AudioProbe) {
                 modifier = Modifier.weight(1f),
             ) { Text(if (running) "Stop capture" else "Start capture") }
         }
+
+        FilterCheckCard(
+            sampleRate = (level?.captureSampleRate ?: info?.sessionSampleRate ?: 48000.0).let { if (it > 0) it.toInt() else 48000 },
+            filter = settings.filter,
+        )
 
         InfoCard("Input route") {
             val i = info
@@ -276,6 +299,31 @@ private fun Envelope(env: FloatArray?) {
             val h = (env[i].coerceIn(0f, 1f)) * mid * 0.95f
             val x = i * step
             drawLine(WaveBlue, Offset(x, mid - h), Offset(x, mid + h), strokeWidth = step.coerceAtLeast(1f))
+        }
+    }
+}
+
+@Composable
+private fun FilterCheckCard(sampleRate: Int, filter: HeartFilter) {
+    var points by remember { mutableStateOf<List<FilterPoint>?>(null) }
+    var checkedFor by remember { mutableStateOf("") }
+    InfoCard("Filter check") {
+        Text(
+            "Plays test tones through the same AudioFilterEngine used for capture. Expect about 0 dB inside the band and -3 dB at its edges.",
+            fontSize = 12.sp, color = Color(0xFF666666),
+        )
+        Spacer(Modifier.height(8.dp))
+        OutlinedButton(onClick = {
+            points = measureFilterResponse(sampleRate, filter)
+            checkedFor = "${filter.label} at $sampleRate Hz"
+        }) { Text("Run filter check") }
+        points?.let { list ->
+            Spacer(Modifier.height(6.dp))
+            Text(checkedFor, fontSize = 12.sp, fontWeight = FontWeight.Medium)
+            list.forEach { p ->
+                val inBand = p.hz >= filter.lowHz && p.hz <= filter.highHz
+                Row2("${p.hz} Hz" + if (inBand) "  (in band)" else "", "${p.gainDb.format1()} dB")
+            }
         }
     }
 }

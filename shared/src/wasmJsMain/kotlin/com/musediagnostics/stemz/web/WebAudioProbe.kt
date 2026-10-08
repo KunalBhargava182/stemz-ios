@@ -12,6 +12,7 @@ import kotlin.math.log10
 import kotlin.math.max
 import kotlin.math.pow
 import kotlin.math.sqrt
+import kotlin.math.tanh
 
 /** JS glue defined in resources/taal-audio.js. */
 external object TaalAudio {
@@ -37,6 +38,7 @@ private data class WebInput(val label: String, val id: String)
 class WebAudioProbe : AudioProbe {
     override val platformLabel: String = "Web"
     override val supportsMonitor: Boolean = true
+    override val supportsMonitorGain: Boolean = true
 
     private var inputs: List<WebInput> = emptyList()
     private var lastRate = 0.0
@@ -188,6 +190,17 @@ class WebAudioProbe : AudioProbe {
                     }
                 }
                 trace.push(filtered, rate, undo)
+
+                // Listen path: filtered * listen volume, soft-limited (Safari input is ~30 dB quieter than native).
+                val g = 10.0.pow(s.monitorGainDb / 20.0)
+                val listen = FloatArray(n)
+                var outPeak = 0f
+                for (i in 0 until n) {
+                    val y = tanh(filtered[i] * g).toFloat()
+                    listen[i] = y
+                    val a = abs(y)
+                    if (a > outPeak) outPeak = a
+                }
                 val (tMin, tMax) = trace.snapshot()
 
                 var envMax = 0.01f
@@ -202,6 +215,7 @@ class WebAudioProbe : AudioProbe {
                         envelope = FloatArray(envLen) { env[(envPos + it) % envLen] / envMax },
                         traceMin = tMin,
                         traceMax = tMax,
+                        outputPeakDbfs = toDb(outPeak),
                     )
                 )
                 if (!reportedInfo) {
@@ -212,7 +226,7 @@ class WebAudioProbe : AudioProbe {
                 // Live monitor: hand the filtered block back to JS for playback (Android AudioTrack monitor).
                 if (s.monitor) {
                     val out = f32New(n)
-                    for (i in 0 until n) f32Set(out, i, filtered[i].toDouble())
+                    for (i in 0 until n) f32Set(out, i, listen[i].toDouble())
                     out
                 } else {
                     null

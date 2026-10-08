@@ -21,6 +21,8 @@ data class LevelUpdate(
     /** Optional live waveform (min/max per 5 ms, last 4 s, scaled to -1..1). Empty = draw envelope. */
     val traceMin: FloatArray = FloatArray(0),
     val traceMax: FloatArray = FloatArray(0),
+    /** Peak of the monitor signal you hear, after the listen volume. -90 when unknown. */
+    val outputPeakDbfs: Float = -90f,
 )
 
 /** Mirrors the Android recorder's heart filter choices (PcgScaleRecordingFragment). */
@@ -35,6 +37,8 @@ data class CaptureSettings(
     val preAmpDb: Float = 10f,
     val humFilter: Boolean = false,
     val monitor: Boolean = false,
+    /** Extra gain applied only to what you hear (not to the graph or saved audio). Web only for now. */
+    val monitorGainDb: Float = 24f,
 )
 
 interface AudioProbe {
@@ -42,6 +46,8 @@ interface AudioProbe {
     val platformLabel: String get() = "iOS"
     /** False hides the Listen switch. */
     val supportsMonitor: Boolean get() = true
+    /** True shows the "Listen volume" slider (web; Safari captures much quieter than the native app). */
+    val supportsMonitorGain: Boolean get() = false
 
     fun requestPermission(onResult: (Boolean) -> Unit)
     fun prepareSession(): String?          // returns error message or null
